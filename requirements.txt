@@ -2,3 +2,5 @@ numpy
 matplotlib
 pandas
 gym
+tensorflow < 2.11
+tensorflow-probability

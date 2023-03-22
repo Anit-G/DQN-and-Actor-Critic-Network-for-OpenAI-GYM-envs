@@ -26,11 +26,11 @@ def DQN(env, agent ,n_episodes=10000, max_t=1000, eps_start=1.0, eps_end=0.01, e
     ''' initialize epsilon '''
 
     for i_episode in range(1, n_episodes+1):
-        state = env.reset()
+        state,_ = env.reset(seed=0)
         score = 0
         for t in range(max_t):
             action = agent.act(state, eps)
-            next_state, reward, done, _ = env.step(action)
+            next_state, reward, done, _ , _= env.step(action)
             agent.step(state, action, reward, next_state, done)
             state = next_state
             score += reward
@@ -62,17 +62,20 @@ def AC(env,agent,episodes=1800):
     # average_reward_list = []
 
     for ep in range(1, episodes + 1):
-        state = env.reset().reshape(1,-1)
+        state,_ = env.reset(seed=0)
+        state = state.reshape(1,-1)
         done = False
         ep_rew = 0
         while not done:
             action = agent.sample_action(state) ##Sample Action
-            next_state, reward, done, info = env.step(action) ##Take action
+            next_state, reward, done, info, _ = env.step(action) ##Take action
             next_state = next_state.reshape(1,-1)
             ep_rew += reward  ##Updating episode reward
             agent.learn(state, action, reward, next_state, done) ##Update Parameters
             state = next_state ##Updating State
+            # print(reward)
         reward_list.append(ep_rew)
+        print('done')
 
         if ep % 10 == 0:
             avg_rew = np.mean(reward_list[-10:])

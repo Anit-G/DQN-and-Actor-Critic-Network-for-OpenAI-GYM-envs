@@ -2,8 +2,10 @@ import random
 import numpy as np
 import torch.optim  as optim
 import tensorflow_probability as tfp
-from Qnet import QNetwork1,ReplayBuffer,device,F,torch
-
+from Qnet import QNetwork1,ReplayBuffer
+import torch 
+import torch.nn.functional as F
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class QnetAgent():
 
     def __init__(self, state_size, action_size, seed,
@@ -53,7 +55,6 @@ class QnetAgent():
             self.qnetwork_target.load_state_dict(self.qnetwork_local.state_dict())
 
     def act(self, state, eps=0.):
-
         state = torch.from_numpy(state).float().unsqueeze(0).to(device)
         self.qnetwork_local.eval()
         with torch.no_grad():
@@ -94,7 +95,8 @@ class QnetAgent():
         self.optimizer.step()
 
 
-from ACModel import ActorCriticModel,tf
+from ACModel import ActorCriticModel
+import tensorflow as tf
 
 class ACAgent:
     """

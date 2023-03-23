@@ -28,15 +28,21 @@ def DQN(env, agent ,n_episodes=10000, max_t=1000, eps_start=1.0, eps_end=0.01, e
     ''' initialize epsilon '''
 
     for i_episode in range(1, n_episodes+1):
-        state,_ = env.reset(seed=0)
+        try:
+            state,_ = env.reset(seed=0)
+        except:
+            state = env.reset(seed=0)
         score = 0
         for t in range(max_t):
             action = agent.act(state, eps)
-            next_state, reward, done, _ , _= env.step(action)
+            try:
+                next_state, reward, done, _ , _= env.step(action)
+            except:
+                next_state, reward, done, _ = env.step(action)
             agent.step(state, action, reward, next_state, done)
             state = next_state
             score += reward
-            print(reward)
+            # print(reward)
             if done:
                 break 
 
@@ -64,14 +70,20 @@ def AC(env,agent,episodes=1800,num_steps=500):
     average_reward_list = []
 
     for ep in range(1, episodes + 1):
-        state,_ = env.reset(seed=0)
+        try:
+            state,_ = env.reset(seed=0)
+        except:
+            state = env.reset(seed=0)
         state = state.reshape(1,-1)
         done = False
         ep_rew = 0
         reward_list = []
         for step in range(num_steps):
             action = agent.sample_action(state) ##Sample Action
-            next_state, reward, done, info, _ = env.step(action) ##Take action
+            try:
+                next_state, reward, done, info, _ = env.step(action) ##Take action
+            except:
+                next_state, reward, done, info = env.step(action) ##Take action
             next_state = next_state.reshape(1,-1)
             ep_rew += reward  ##Updating episode reward
             reward_list.append(reward)

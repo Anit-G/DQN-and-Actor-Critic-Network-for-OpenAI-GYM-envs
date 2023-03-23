@@ -6,6 +6,7 @@ from Qnet import QNetwork1,ReplayBuffer
 import torch 
 import torch.nn.functional as F
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class QnetAgent():
 
     def __init__(self, state_size, action_size, seed,
@@ -98,6 +99,13 @@ class QnetAgent():
 from ACModel import ActorCriticModel
 import tensorflow as tf
 
+def get_expected_return(returns,discount=0.99):
+    returns = returns[::-1]
+    reward = returns[0]
+    for t in range(1,len(returns)):
+        reward = returns[t]+discount*reward
+    return reward
+
 class ACAgent:
     """
     Agent class for Actor Critic Model
@@ -132,7 +140,7 @@ class ACAgent:
         return delta**2
 
     @tf.function
-    def learn(self, state, action, reward, next_state, done):
+    def learn(self, state, action, rewards, next_state, done, return_type=1):
         """
         For a given transition (s,a,s',r) update the paramters by computing the
         gradient of the total loss
@@ -147,7 +155,21 @@ class ACAgent:
 
             #### TO DO: Write the equation for delta (TD error)
             ## Write code below
-            delta = reward + self.gamma*V_s_next-V_s
+            if not isinstance(rewards,list):
+                # 1 Step Return
+                delta = rewards + self.gamma*V_s_next-V_s
+            elif return_type==-1:
+                # Full Return, MC return
+                delta = get_expected_return(rewards,self.gamma) - V_s
+                pass
+            elif isinstance(return_type,int):
+                # N-step return
+                delta = get_expected_return(rewards[:return_type],self.gamma) + self.gamma**return_type*V_s_next-V_s
+                pass
+            else:
+                print('Incorrect Return Type')
+
+        
             loss_a = self.actor_loss(action, pi, delta)
             loss_c =self.critic_loss(delta)
             loss_total = loss_a + loss_c

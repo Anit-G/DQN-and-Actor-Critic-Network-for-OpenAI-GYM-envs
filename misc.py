@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from collections import deque
+from collections import deque, namedtuple
 import tensorflow as tf
 tf.compat.v1.reset_default_graph()
 
@@ -118,77 +118,104 @@ import torch
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Experiments():
-    def __init__(self,batchsize=64,buffersize=int(1e5),q_gamma=0.99,q_lr=5e-4,update=20,target_units=[64,32],local_units=[64,32],
-                      q_episodes=5000,max_t=1000,eps_s=1.0,eps_e=0.01,eps_d=0.995,
-                      ac_lr=1e-4,ac_gamma=0.99,nh1=1024,nh2=512,rt=1,
-                      ac_episodes=1800,num_steps=500):
+    def __init__(self):
+        self.DQNexperiment_num = 0
+        self.DQN_reward_record = []
+        self.DQN_parameters = []
 
-        # DQN Agent Parameters
-        self.batchsize=batchsize,
-        self.buffersize=buffersize,
-        self.q_gamma=q_gamma,
-        self.q_lr=q_lr,
-        self.update=update,
-        self.target_units=target_units,
-        self.local_units=local_units,
+        self.ACexperiment_num = 0
+        self.AC_reward_record = []
+        self.AC_parameters = []
 
-        # DQN model Parameters
-        self.q_episodes=q_episodes,
-        self.max_t=max_t,
-        self.eps_s=eps_s,
-        self.eps_e=eps_e,
-        self.eps_d=eps_d,
-
-
-        # Actor-Critic Agent Parameters
-        self.ac_lr=ac_lr,
-        self.ac_gamma=ac_gamma,
-        self.nh1=nh1,
-        self.nh2=nh2,
-        self.rt=rt,
-
-        # AC Model Parameters
-        self.ac_episodes=ac_episodes,
-        self.num_steps=num_steps
+        self.q_parameters = namedtuple("DQN Hyperparameters", field_names=["BatchSize", "BufferSize", "Gamma", "LearningRate",
+                                                                           "EpsStart", "EpsEnd", "EpsDecay", "Episodes", "MaxTimeStep",
+                                                                           "Update", "TargetUnits", "LocalUnits", "Time"])
+        
+        self.ac_parameters = namedtuple("AC Hyperparameters", field_names=[ "Gamma", "LearningRate","Hidden1", "Hidden2"
+                                                                           "Episodes", "NumTimeStep", "ReturnType", "Time"])
         pass
 
-    def DQN_experiment(self,env_fn=mountaincar):
+    def plot(self,data,comp=1):
+        plt.figure()
+        plt.plot(data)
+        plt.xlabel('Episode Count')
+        plt.ylabel('Reward per episode')
+        plt.title(f'Reward Curve\nCompletion in {comp} episodes')
+        plt.show()
+        
+    def DQN_experiment(self,
+                       env_fn=mountaincar,
+                       batchsize=64,buffersize=int(1e5),q_gamma=0.99,q_lr=5e-4,update=20,target_units=[64,32],local_units=[64,32],
+                       q_episodes=5000,max_t=1000,eps_s=1.0,eps_e=0.01,eps_d=0.995,):
+        
         begin_time = datetime.datetime.now()
         env, state_shape, action_shape = env_fn()
         agent = QnetAgent(state_size=state_shape, action_size = action_shape, seed = 42,
-                        BUFFER_SIZE = int(1e5),
-                        BATCH_SIZE = 64,
-                        GAMMA = 0.99,
-                        LR = 5e-4,
-                        UPDATE_EVERY = 20,
-                        target_fc_units = [64, 32],
-                        local_fc_units = [64, 32])
+                        BUFFER_SIZE = batchsize,
+                        BATCH_SIZE = buffersize,
+                        GAMMA = q_gamma,
+                        LR = q_lr,
+                        UPDATE_EVERY = update,
+                        target_fc_units = target_units,
+                        local_fc_units = local_units)
         rewards_epsilon = DQN(env=env,agent=agent, 
-                              n_episodes=5000, 
-                              max_t=1000, 
-                              eps_start=1.0,
-                              eps_end=0.01,
-                              eps_decay=0.995)
+                              n_episodes=q_episodes, 
+                              max_t=max_t, 
+                              eps_start=eps_s,
+                              eps_end=eps_e,
+                              eps_decay=eps_d)
 
         time_taken = datetime.datetime.now() - begin_time
         # print(f"Time of Completion for Trainig: {time_taken}")
+
+        self.DQN_reward_record.append([rewards_epsilon, time_taken])
+        self.DQN_parameters.append(self.q_parameters(batchsize,buffersize,q_gamma,q_lr,eps_s,eps_e,eps_d,q_episodes,max_t,update,target_units,local_units,time_taken))
         return rewards_epsilon, time_taken
     
-    def AC_experiment(self, env_fn=cartpole):
+    def AC_experiment(self, 
+                      env_fn=cartpole,
+                      ac_lr=1e-4,ac_gamma=0.99,nh1=1024,nh2=512,rt=1,
+                      ac_episodes=1800,num_steps=500):
+        
         begin_time = datetime.datetime.now()
 
         env, state_shape, action_shape = env_fn()
-        agent = ACAgent(state_size = state_shape ,action_size=env.action_space.n, 
-                        lr=1e-4,
-                        gamma=0.99, 
+        agent = ACAgent(state_size = state_shape , action_size=env.action_space.n, 
+                        lr=ac_lr,
+                        gamma=ac_gamma, 
                         seed = 42,
-                        n_h1 = 1024,
-                        n_h2 = 512,
-                        return_type=1)
+                        n_h1 = nh1,
+                        n_h2 = nh2,
+                        return_type=rt)
         rewards_epsilon = AC(env=env,agent=agent, 
-                             episodes=1800, 
-                             num_steps=500)
+                             episodes=ac_episodes, 
+                             num_steps=num_steps)
 
         time_taken = datetime.datetime.now() - begin_time
         # print(f"Time of Completion for Trainig: {time_taken}")
+        self.AC_reward_record.append([rewards_epsilon, time_taken])
+        self.AC_parameters.append(self.ac_parameters(ac_gamma,ac_lr,nh1,nh2,ac_episodes,num_steps,rt,time_taken))
         return rewards_epsilon, time_taken
+    
+    def inference_output(self):
+
+        return self.DQN_reward_record, self.AC_reward_record, self.DQN_parameters, self.AC_parameters
+    
+    def plot_reward_dqn(self):
+        for (r,t),p in zip(self.DQN_reward_record,self.DQN_parameters):
+            fig, ax = plt.subplots(1,1,figsize=(10,7))
+            ax.plot(r)
+            ax.set_xlabel("Episode Count")
+            ax.set_ylabel("Reward per Episode")
+            ax.set_title(f'Reward Curve\nCompletion in {t} episodes')
+            fig.text(0.5,0.01,str(p),wrap=True, horizontalalignment='center', fontsize=12)
+
+    def plot_reward_ac(self):
+        for (r,t),p in zip(self.AC_reward_record,self.AC_parameters):
+            fig, ax = plt.subplots(1,1,figsize=(10,7))
+            ax.plot(r)
+            ax.set_xlabel("Episode Count")
+            ax.set_ylabel("Reward per Episode")
+            ax.set_title(f'Reward Curve\nCompletion in {t} episodes')
+            fig.text(0.5,0.01,str(p),wrap=True, horizontalalignment='center', fontsize=12)
+    

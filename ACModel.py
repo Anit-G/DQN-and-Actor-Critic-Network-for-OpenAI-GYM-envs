@@ -4,9 +4,11 @@ class ActorCriticModel(tf.keras.Model):
     """
     Defining policy and value networkss
     """
-    def __init__(self, action_size, n_hidden1=1024, n_hidden2=512):
+    def __init__(self,state_size ,action_size, n_hidden1=1024, n_hidden2=512, seed = 42):
         super(ActorCriticModel, self).__init__()
-
+        tf.random.set_seed(seed=seed)
+        # Input layer
+        # self.input_layer = tf.keras.layers.Input(state_size)
         #Hidden Layer 1
         self.fc1 = tf.keras.layers.Dense(n_hidden1, activation='relu')
         #Hidden Layer 2
@@ -21,6 +23,7 @@ class ActorCriticModel(tf.keras.Model):
         """
         Computes policy distribution and state-value for a given state
         """
+        # state = self.input_layer(state)
         layer1 = self.fc1(state)
         layer2 = self.fc2(layer1)
 

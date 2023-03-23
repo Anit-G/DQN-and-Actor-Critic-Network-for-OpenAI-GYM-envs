@@ -8,7 +8,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class QNetwork1(nn.Module):
 
-    def __init__(self, state_size, action_size, seed, fc1_units=128, fc2_units=64):
+    def __init__(self, state_size, action_size, seed = 42, fc1_units=64, fc2_units=32):
         """Initialize parameters and build model.
         Params
         ======
@@ -23,7 +23,6 @@ class QNetwork1(nn.Module):
         self.fc1 = nn.Linear(state_size, fc1_units)
         self.fc2 = nn.Linear(fc1_units, fc2_units)
         self.fc3 = nn.Linear(fc2_units, action_size)
-
     def forward(self, state):
         """Build a network that maps state -> action values."""
         x = F.relu(self.fc1(state))
@@ -34,7 +33,7 @@ class QNetwork1(nn.Module):
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
-    def __init__(self, action_size, buffer_size, batch_size, seed):
+    def __init__(self, action_size, buffer_size, batch_size, seed = 42):
         """Initialize a ReplayBuffer object.
 
         Params
@@ -48,7 +47,7 @@ class ReplayBuffer:
         self.memory = deque(maxlen=buffer_size)  
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-        self.seed = random.seed(seed)
+        self.seed = seed
     
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""

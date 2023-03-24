@@ -31,3 +31,25 @@ class ActorCriticModel(tf.keras.Model):
         v = self.v_out(layer2)
 
         return pi, v
+    
+import torch
+import torch.nn.functional as F
+
+class ActorCritic_Torch(torch.nn.Module):
+    def __init__(self,state_size, action_size, hidden1_dim, hidden2_dim):
+        super(ActorCritic_Torch, self).__init__()
+        self.fc1 = torch.nn.Linear(state_size,hidden1_dim)
+        self.fc2 = torch.nn.Linear(hidden1_dim,hidden2_dim)
+        self.actor = torch.nn.Linear(hidden2_dim,action_size)
+        self.critic = torch.nn.Linear(hidden2_dim,1)
+
+    def forward(self,state):
+        x = F.relu(self.fc1(state))
+        x = F.relu(self.fc2(x))
+
+        pi = F.softmax(self.actor(x))
+        # pi = F.tanh(self.actor(x))
+        v = self.critic(x)
+
+        return pi,v
+

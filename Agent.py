@@ -120,8 +120,8 @@ class ACAgent:
                  lr=0.001, 
                  gamma=0.99, 
                  seed = 42,
-                 n_h1 = 1024,
-                 n_h2 = 512,
+                 n_h1 = 64,
+                 n_h2 = 32,
                  return_type=1):
         
         self.gamma = gamma
@@ -194,3 +194,121 @@ class ACAgent:
 
         gradient = tape.gradient(loss_total, self.ac_model.trainable_variables)
         self.ac_model.optimizer.apply_gradients(zip(gradient, self.ac_model.trainable_variables))
+
+
+from ACModel import ActorCritic_Torch
+import torch.optim  as optim
+import tensorflow_probability as tfp
+
+class ACAgent_torch:
+    '''
+    Agent class for Actor Critic Model
+    '''
+    def __init__(self, state_size, action_size, 
+                 lr=0.001, 
+                 gamma=0.99, 
+                 seed = 42,
+                 n_h1 = 128,
+                 n_h2 = 128,
+                 return_type=1):
+        
+        np.random.seed(seed)
+        self.gamma = gamma
+        self.ac_model = ActorCritic_Torch(state_size=state_size, action_size=action_size, hidden1_dim=n_h1, hidden2_dim=n_h2)
+        self.rt = return_type       # one-step, Full or n-step return
+
+        self.optimizer = optim.Adam(self.ac_model.parameters(), lr=lr)
+    
+    def get_expected_return(self, returns):
+        returns = returns[::-1]
+        reward = returns[0]
+        for t in range(1,len(returns)):
+            reward = returns[t]+self.gamma*reward
+        return reward
+    
+    def calculate_delta(self,rewards,Vn,V):
+        if self.rt == 1 or (not isinstance(rewards,list)):
+            # 1 Step Return
+            delta = rewards + self.gamma*Vn-V
+        elif self.rt == -1:
+            # Full Return, MC return
+            delta = self.get_expected_return(rewards) - V
+        elif isinstance(rewards,list) and self.rt > 1:
+            # N-step return
+            delta = self.get_expected_return(rewards[:self.rt]) + (self.gamma**self.rt)*Vn-V
+        else:
+            print('Incorrect Return Type or Reward structure')
+            print(f"Return Type: {self.rt}")
+            print(f"Reward Shape: {len(rewards)}")
+            delta = 1.0
+        return delta
+
+    def sample_action(self,state):
+        """
+        Given a state, compute the policy distribution over all actions and sample one action
+        """
+
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        pi,v = self.ac_model(state_tensor)
+        
+        action_dist = torch.distributions.Categorical(probs = pi)
+        # action_dist = torch.distributions.Normal(pi,F.softplus(v))
+        sample_act = action_dist.sample()
+        
+        logprob = action_dist.log_prob(sample_act)
+
+        # print()
+        # print("--------Sample Action Process-------")
+        # print(pi)
+        # print(v, F.softplus(v))
+        # print(action_dist)
+        # print(sample_act)
+        # print(sample_act.squeeze(0).numpy())    
+        return int(sample_act.squeeze(0).numpy()), logprob
+    
+    def actor_loss(self,logprob, delta):
+        '''
+        Compute Actor loss
+
+        Args:
+            logprob:
+                Log Probability of action at time t which gives state at t+1
+            delta:
+                TD Error = r(t+1) + gamma*V(t+1)-V(t) 
+        Return:
+            Actor loss = -logprob*delta
+        '''
+        # delta = r+self.gamma*V_n-V
+
+        return -logprob*delta.detach()
+    
+    def critic_loss(self,delta):
+        '''
+        Critic Loss aim to minimize TD error
+        '''
+        return delta**2
+    
+    def learn(self, state, action, rewards, next_state, done):
+        '''
+        For a given transition (s,a,s',r) update the paramters by computing the
+        gradient of the total loss
+        '''
+        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        next_state_tensor = torch.tensor(next_state, dtype=torch.float32).unsqueeze(0)
+        _, V_t = self.ac_model(state_tensor)
+        _ , V_n = self.ac_model(next_state_tensor) 
+
+        _,logprob = self.sample_action(state)
+        # delta = self.calculate_delta(rewards,V_n.detach().item(),V_t.detach().item())
+        delta = self.calculate_delta(rewards,V_n,V_t)
+
+
+        a_loss = self.actor_loss(logprob,delta)
+        c_loss = self.critic_loss(delta)
+    
+        # Update parameters
+        self.optimizer.zero_grad()
+        c_loss.backward(retain_graph=True)
+        a_loss.sum().backward()
+        self.optimizer.step()
+

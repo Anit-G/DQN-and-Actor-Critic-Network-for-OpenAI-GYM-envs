@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque, namedtuple
 import tensorflow as tf
+from tqdm import tqdm
 tf.compat.v1.reset_default_graph()
 
 def plot(data,comp=1):
@@ -69,7 +70,7 @@ def DQN(env, agent ,n_episodes=5000, max_t=1000, eps_start=1.0, eps_end=0.01, ep
 def AC(env,agent, episodes=1800, num_steps=500, seed = 42):  
     average_reward_list = []
 
-    for ep in range(1, episodes + 1):
+    for ep in tqdm(range(1, episodes + 1)):
         try:
             state,_ = env.reset(seed=seed)
         except:
@@ -107,7 +108,44 @@ def AC(env,agent, episodes=1800, num_steps=500, seed = 42):
                 break
     
     return average_reward_list
+
+def AC_Torch(env, agent, episodes=1800, num_steps=500, seed=42):
+    Total_rewards = []    
+    for ep in range(1,episodes+1):
+        # Begin Episode
+        state, _ = env.reset(seed=seed)
+        done = False
+        ep_rwd = 0
+        reward_list = []
+
+        for step in range(num_steps):
+            
+            # Begin Iteration in episode
+            action,_ = agent.sample_action(state)
+            next_state, reward, done, info, _ = env.step(action)
+            agent.learn(state, action, reward, next_state, done)
+
+            ep_rwd += reward
+            state = next_state
+            reward_list.append(reward)
+            if done:
+                break
+
+        Total_rewards.append(ep_rwd)
+
+        # Print Results 
+        if ep % 10 == 0:
+            avg_rwd = np.mean(Total_rewards[-10:])
+            print(f'Episode: {ep}   Episode Reward: {ep_rwd:.3f}    Average Reward: {avg_rwd:.3f}   Steps: {step:.3f}   done: {done}    info: {info}')
+            # print('Episode ', ep, 'Episode Reward %f' % ep_rwd, 'Average Reward %f' % avg_rwd, 'Number of steps %f' % step, f'done: {done}')
         
+        if ep % 100:
+            avg_100 = np.mean(Total_rewards[-100:])
+            if avg_100>195.0:
+                print(f'Stopped at Episode: {ep-100}')
+                break
+    return Total_rewards
+
 
 import numpy as np
 import datetime
@@ -119,19 +157,19 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Experiments():
     def __init__(self):
-        self.DQNexperiment_num = 0
+        self.DQNexperiment_num = 1
         self.DQN_reward_record = []
         self.DQN_parameters = []
 
-        self.ACexperiment_num = 0
+        self.ACexperiment_num = 1
         self.AC_reward_record = []
         self.AC_parameters = []
 
-        self.q_parameters = namedtuple("DQN Hyperparameters", field_names=["BatchSize", "BufferSize", "Gamma", "LearningRate",
+        self.q_parameters = namedtuple("DQN_Hyperparameters", field_names=["ExperimentNum", "BatchSize", "BufferSize", "Gamma", "LearningRate",
                                                                            "EpsStart", "EpsEnd", "EpsDecay", "Episodes", "MaxTimeStep",
                                                                            "Update", "TargetUnits", "LocalUnits", "Time"])
         
-        self.ac_parameters = namedtuple("AC Hyperparameters", field_names=[ "Gamma", "LearningRate","Hidden1", "Hidden2"
+        self.ac_parameters = namedtuple("AC_Hyperparameters", field_names=["ExperimentNum", "Gamma", "LearningRate","Hidden1", "Hidden2"
                                                                            "Episodes", "NumTimeStep", "ReturnType", "Time"])
         pass
 
@@ -169,7 +207,8 @@ class Experiments():
         # print(f"Time of Completion for Trainig: {time_taken}")
 
         self.DQN_reward_record.append([rewards_epsilon, time_taken])
-        self.DQN_parameters.append(self.q_parameters(batchsize,buffersize,q_gamma,q_lr,eps_s,eps_e,eps_d,q_episodes,max_t,update,target_units,local_units,time_taken))
+        self.DQN_parameters.append(self.q_parameters(self.DQNexperiment_num,batchsize,buffersize,q_gamma,q_lr,eps_s,eps_e,eps_d,q_episodes,max_t,update,target_units,local_units,time_taken))
+        self.DQNexperiment_num +=1
         return rewards_epsilon, time_taken
     
     def AC_experiment(self, 
@@ -194,7 +233,8 @@ class Experiments():
         time_taken = datetime.datetime.now() - begin_time
         # print(f"Time of Completion for Trainig: {time_taken}")
         self.AC_reward_record.append([rewards_epsilon, time_taken])
-        self.AC_parameters.append(self.ac_parameters(ac_gamma,ac_lr,nh1,nh2,ac_episodes,num_steps,rt,time_taken))
+        self.AC_parameters.append(self.ac_parameters(self.ACexperiment_num,ac_gamma,ac_lr,nh1,nh2,ac_episodes,num_steps,rt,time_taken))
+        self.ACexperiment_num +=1
         return rewards_epsilon, time_taken
     
     def inference_output(self):
@@ -207,7 +247,7 @@ class Experiments():
             ax.plot(r)
             ax.set_xlabel("Episode Count")
             ax.set_ylabel("Reward per Episode")
-            ax.set_title(f'Reward Curve\nCompletion in {t} episodes')
+            ax.set_title(f'DQN Reward Curve for Experiement {p.ExperimentNum}\nCompletion in {t} episodes')
             fig.text(0.5,0.01,str(p),wrap=True, horizontalalignment='center', fontsize=12)
 
     def plot_reward_ac(self):
@@ -216,6 +256,6 @@ class Experiments():
             ax.plot(r)
             ax.set_xlabel("Episode Count")
             ax.set_ylabel("Reward per Episode")
-            ax.set_title(f'Reward Curve\nCompletion in {t} episodes')
+            ax.set_title(f'AC Reward Curve for Experiement {p.ExperimentNum}\nCompletion in {t} episodes')
             fig.text(0.5,0.01,str(p),wrap=True, horizontalalignment='center', fontsize=12)
     
